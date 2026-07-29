@@ -665,7 +665,10 @@ async function sendMagicLink(){
   btn.disabled = true; btn.textContent = 'Enviando...';
   const { error } = await sb.auth.signInWithOtp({
     email,
-    options: { shouldCreateUser: true }
+    options: { 
+      shouldCreateUser: true,
+      emailRedirectTo: 'https://ivan-1750-wing21.github.io/Wing11'
+    }
   });
   if(error){
     showAuthError(error.message);
