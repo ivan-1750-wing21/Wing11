@@ -1,0 +1,1329 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wing11 — Performance Tracker</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+/* ── TOKENS ─────────────────────────────────────────── */
+:root{
+  --bg:#0e0e0f;--surface:#18181a;--card:#1e1e21;--card2:#242428;
+  --border:#2a2a2e;--border2:#38383d;
+  --text:#f0f0ee;--muted:#888886;--dim:#555553;
+  --accent:#4f8ef7;--accent-dim:#1a2d4a;
+  --green:#2dba74;--green-dim:#0d2e1e;
+  --red:#e85555;--red-dim:#2e1010;
+  --amber:#f5a623;--amber-dim:#2e2008;
+  --purple:#a855f7;--purple-dim:#1e0d33;
+  --teal:#14b8a6;--teal-dim:#0a2e2b;
+  --r:10px;--rl:16px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{font-size:16px}
+body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;min-height:100vh}
+
+/* ── AUTH SCREEN ─────────────────────────────────────── */
+#auth-screen{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;padding:2rem}
+.auth-logo{font-size:32px;font-weight:700;letter-spacing:-1px;margin-bottom:8px}
+.auth-logo span{color:var(--accent)}
+.auth-sub{font-size:14px;color:var(--muted);margin-bottom:2.5rem;text-align:center}
+.auth-card{background:var(--card);border:1px solid var(--border);border-radius:var(--rl);padding:2rem;width:100%;max-width:360px;text-align:center}
+.auth-card h2{font-size:18px;font-weight:600;margin-bottom:6px}
+.auth-card p{font-size:13px;color:var(--muted);margin-bottom:1.5rem;line-height:1.6}
+.auth-input{width:100%;padding:11px 14px;border-radius:10px;background:var(--surface);border:1px solid var(--border2);color:var(--text);font-size:14px;font-family:inherit;margin-bottom:10px;transition:border-color .15s}
+.auth-input:focus{outline:none;border-color:var(--accent)}
+.auth-input::placeholder{color:var(--dim)}
+.btn-magic{width:100%;padding:12px;border-radius:10px;background:var(--accent);border:none;color:#fff;font-size:14px;font-weight:600;cursor:pointer;transition:opacity .15s}
+.btn-magic:hover{opacity:.88}
+.btn-magic:disabled{opacity:.4;cursor:not-allowed}
+.auth-sent{background:var(--green-dim);border:1px solid #1a4a2e;border-radius:10px;padding:14px;font-size:13px;color:#5dd68a;line-height:1.6;display:none;text-align:left}
+
+/* ── NAV ─────────────────────────────────────────────── */
+#app{display:none}
+.app-nav{background:var(--surface);border-bottom:1px solid var(--border);padding:0 1rem;display:flex;align-items:center;justify-content:space-between;height:52px;position:sticky;top:0;z-index:100}
+.app-logo{font-size:15px;font-weight:700;letter-spacing:-.3px}
+.app-logo span{color:var(--accent)}
+.nav-tabs{display:flex;gap:2px;overflow-x:auto}
+.nav-tab{padding:5px 12px;border-radius:8px;font-size:12px;color:var(--muted);background:none;border:none;cursor:pointer;transition:all .15s;font-weight:500;white-space:nowrap}
+.nav-tab.active{background:var(--card);color:var(--text)}
+.nav-tab:hover:not(.active){color:var(--text)}
+.nav-user{display:flex;align-items:center;gap:8px}
+.avatar-sm{width:28px;height:28px;border-radius:50%;background:var(--accent-dim);border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;color:var(--accent);overflow:hidden}
+.avatar-sm img{width:100%;height:100%;object-fit:cover}
+.btn-signout{background:none;border:none;color:var(--dim);cursor:pointer;font-size:12px;padding:4px 8px;border-radius:6px}
+.btn-signout:hover{color:var(--red)}
+
+/* ── VIEWS ───────────────────────────────────────────── */
+.view{display:none;max-width:760px;margin:0 auto;padding:1.25rem 1rem 5rem}
+.view.active{display:block}
+.page-title{font-size:20px;font-weight:700;letter-spacing:-.5px;margin-bottom:3px}
+.page-sub{font-size:13px;color:var(--muted);margin-bottom:1.25rem}
+.section-label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--dim);margin:1.25rem 0 .6rem}
+
+/* ── CARDS ───────────────────────────────────────────── */
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--rl);padding:1.25rem;margin-bottom:.75rem}
+.card-title{font-size:13px;font-weight:600;margin-bottom:2px}
+.card-sub{font-size:12px;color:var(--muted);margin-bottom:.75rem}
+
+/* ── FIELDS ──────────────────────────────────────────── */
+.field-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:.6rem}
+.field{display:flex;flex-direction:column;gap:4px}
+.field label{font-size:12px;color:var(--muted);font-weight:500}
+.field input,.field select,.field textarea{background:var(--surface);border:1px solid var(--border2);border-radius:8px;color:var(--text);font-size:13px;padding:8px 11px;width:100%;transition:border-color .15s;font-family:inherit}
+.field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:var(--accent)}
+.field input::placeholder{color:var(--dim)}
+.field-full{grid-column:1/-1}
+
+/* ── BUTTONS ─────────────────────────────────────────── */
+.btn{padding:9px 18px;border-radius:9px;font-size:13px;font-weight:600;cursor:pointer;border:none;transition:all .15s;font-family:inherit}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-primary:hover{opacity:.88}
+.btn-primary:disabled{opacity:.4;cursor:not-allowed}
+.btn-ghost{background:var(--card);color:var(--muted);border:1px solid var(--border2)}
+.btn-ghost:hover{color:var(--text)}
+.btn-row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:.75rem}
+
+/* ── KPI GRID ────────────────────────────────────────── */
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin-bottom:1rem}
+.kpi{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:12px}
+.kpi-label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px}
+.kpi-val{font-size:22px;font-weight:700;letter-spacing:-1px;line-height:1}
+.kpi-sub{font-size:11px;color:var(--muted);margin-top:4px}
+.kpi-bar{height:2px;background:var(--border);border-radius:2px;margin-top:8px;overflow:hidden}
+.kpi-fill{height:100%;border-radius:2px;transition:width .6s}
+
+/* ── FIFA CARD ───────────────────────────────────────── */
+.fifa-wrap{background:linear-gradient(155deg,#1a2e1a 0%,#0d1f0d 55%,#0a150a 100%);border:1px solid #2a4a2a;border-radius:var(--rl);padding:1.25rem;margin-bottom:.75rem}
+.fifa-top{display:flex;gap:14px;align-items:flex-start;margin-bottom:10px}
+.fifa-left{display:flex;flex-direction:column;align-items:center;min-width:60px}
+.fifa-pos{font-size:20px;font-weight:700;color:var(--green);line-height:1}
+.fifa-ovr{font-size:44px;font-weight:700;color:var(--text);line-height:1;letter-spacing:-2px}
+.fifa-name{font-size:13px;font-weight:700;color:var(--text);text-align:center;letter-spacing:.05em;margin-bottom:10px}
+.fifa-attrs{display:grid;grid-template-columns:1fr 1fr;gap:5px 10px}
+.fa{display:flex;align-items:center;gap:5px}
+.fa-val{font-size:13px;font-weight:700;min-width:22px}
+.fa-bar{flex:1;height:3px;background:rgba(255,255,255,.1);border-radius:2px;overflow:hidden}
+.fa-fill{height:100%;border-radius:2px;transition:width .5s}
+.fa-lbl{font-size:10px;color:#555;text-transform:uppercase;letter-spacing:.06em}
+.tier-badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:10px;font-weight:600;margin-top:8px}
+
+/* ── MATCH ITEMS ─────────────────────────────────────── */
+.match-item{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:12px 14px;margin-bottom:6px}
+.match-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px}
+.match-name{font-size:13px;font-weight:600}
+.match-date{font-size:11px;color:var(--muted);margin-top:2px}
+.match-stats{display:flex;gap:10px;flex-wrap:wrap}
+.match-stat{font-size:11px;color:var(--muted)}
+.match-stat strong{color:var(--text)}
+.btn-del{background:none;border:none;color:var(--dim);cursor:pointer;font-size:16px;line-height:1;padding:2px;transition:color .15s}
+.btn-del:hover{color:var(--red)}
+
+/* ── HIST ITEMS ──────────────────────────────────────── */
+.hist-item{display:flex;gap:10px;padding:9px 11px;background:var(--card2);border-radius:var(--r);border:1px solid var(--border);margin-bottom:5px;align-items:flex-start}
+.hist-date-col{min-width:68px;flex-shrink:0}
+.hist-date{font-size:11px;color:var(--muted)}
+.hist-type-pill{font-size:10px;padding:1px 6px;border-radius:8px;font-weight:500;margin-top:3px;display:inline-block}
+.hist-body{flex:1}
+.hist-title{font-size:12px;font-weight:600;margin-bottom:3px}
+.hist-chips{display:flex;gap:5px;flex-wrap:wrap}
+.hist-chip{font-size:10px;padding:1px 7px;border-radius:8px;background:var(--surface);border:1px solid var(--border);color:var(--muted)}
+.hist-chip strong{color:var(--text)}
+
+/* ── AI BOX ──────────────────────────────────────────── */
+.ai-box{background:var(--card);border:1px solid var(--border2);border-radius:var(--rl);padding:1.25rem;margin-top:.75rem}
+.ai-header{display:flex;align-items:center;gap:10px;margin-bottom:.75rem}
+.ai-icon{width:30px;height:30px;background:var(--accent-dim);border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--accent);font-size:14px;flex-shrink:0}
+.ai-title{font-size:13px;font-weight:600}
+.ai-sub{font-size:11px;color:var(--muted)}
+.ai-content{font-size:13px;color:var(--text);line-height:1.7}
+.ai-content.loading{color:var(--muted);font-style:italic}
+.cursor{display:inline-block;width:2px;height:13px;background:var(--accent);animation:blink .7s infinite;vertical-align:middle;margin-left:2px}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+
+/* ── WEIGHT CHART ────────────────────────────────────── */
+.chart-wrap{position:relative;width:100%}
+.range-tabs{display:flex;gap:4px;margin-bottom:10px;flex-wrap:wrap}
+.rtab{font-size:11px;padding:3px 10px;border-radius:20px;border:1px solid var(--border2);background:none;color:var(--muted);cursor:pointer;transition:all .15s}
+.rtab.active{background:var(--card2);color:var(--text);border-color:var(--border2)}
+
+/* ── TEST BLOCKS ─────────────────────────────────────── */
+.test-block{border:1px solid var(--border);border-radius:var(--r);padding:12px;margin-bottom:8px;transition:border-color .2s}
+.test-block.filled{border-color:var(--accent)}
+.test-name{font-size:13px;font-weight:600;margin-bottom:2px}
+.test-proto{font-size:11px;color:var(--muted);margin-bottom:8px;line-height:1.5}
+.score-pill{font-size:20px;font-weight:700;min-width:42px;text-align:right}
+.pbar{height:3px;background:var(--border);border-radius:2px;margin-top:6px;overflow:hidden}
+.pfill{height:100%;border-radius:2px;transition:width .6s}
+.bench-row{display:flex;gap:5px;flex-wrap:wrap;margin-top:6px}
+.bench-chip{font-size:10px;padding:1px 7px;border-radius:8px;border:1px solid var(--border);color:var(--muted)}
+.bench-chip b{color:var(--text)}
+
+/* ── MISC ────────────────────────────────────────────── */
+.attr-pill{font-size:10px;font-weight:500;padding:2px 8px;border-radius:10px;display:inline-block;margin-top:3px}
+.empty{text-align:center;padding:2.5rem 1rem;color:var(--muted)}
+.empty-icon{font-size:32px;margin-bottom:.75rem}
+.empty-title{font-size:14px;font-weight:600;color:var(--dim);margin-bottom:.4rem}
+.empty-text{font-size:12px;line-height:1.6;max-width:260px;margin:0 auto}
+.toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--green);color:#fff;padding:9px 20px;border-radius:30px;font-size:12px;font-weight:600;opacity:0;transition:opacity .3s;pointer-events:none;z-index:999}
+.toast.show{opacity:1}
+.toast.err{background:var(--red)}
+.tip-box{background:var(--green-dim);border:1px solid #1a4a2e;border-radius:var(--r);padding:10px 12px;margin-bottom:.75rem;font-size:12px;color:#5dd68a;line-height:1.6}
+.formula-box{background:var(--accent-dim);border:1px solid #253d6e;border-radius:var(--r);padding:10px 12px;margin-top:6px;font-size:11px;color:var(--accent);line-height:1.7}
+.spinner{width:14px;height:14px;border:2px solid var(--border2);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;flex-shrink:0}
+@keyframes spin{to{transform:rotate(360deg)}}
+.delta-pos{color:var(--red)}
+.delta-neg{color:var(--green)}
+
+@media(max-width:480px){
+  .nav-tab{padding:5px 8px;font-size:11px}
+  .kpi-grid{grid-template-columns:1fr 1fr}
+  .fifa-ovr{font-size:36px}
+}
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════════════
+     AUTH SCREEN
+════════════════════════════════════════════════════════ -->
+<div id="auth-screen">
+  <div class="auth-logo">WING<span>11</span></div>
+  <div class="auth-sub">Performance tracker para atletas de rugby</div>
+  <div class="auth-card">
+    <h2>Bem-vindo</h2>
+    <p>Digite seu email para receber o link de acesso. Funciona no notebook e no celular com a mesma conta.</p>
+    <div id="auth-form">
+      <input type="email" class="auth-input" id="auth-email" placeholder="seu@email.com">
+      <button class="btn-magic" id="btn-magic" onclick="sendMagicLink()">Enviar link de acesso</button>
+      <div id="auth-error" style="margin-top:10px;font-size:12px;color:var(--red);display:none"></div>
+    </div>
+    <div class="auth-sent" id="auth-sent">
+      Link enviado para <strong id="auth-sent-email"></strong><br><br>
+      Abra seu email e clique no link — ele vai entrar automaticamente.
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════
+     APP
+════════════════════════════════════════════════════════ -->
+<div id="app">
+<nav class="app-nav">
+  <div class="app-logo">WING<span>11</span></div>
+  <div class="nav-tabs">
+    <button class="nav-tab active" onclick="showView('perfil',this)">Perfil</button>
+    <button class="nav-tab" onclick="showView('dashboard',this)">Dashboard</button>
+    <button class="nav-tab" onclick="showView('treinos',this)">Treinos</button>
+    <button class="nav-tab" onclick="showView('testes',this)">Testes</button>
+    <button class="nav-tab" onclick="showView('partidas',this)">Partidas</button>
+    <button class="nav-tab" onclick="showView('peso',this)">Peso</button>
+  </div>
+  <div class="nav-user">
+    <div class="avatar-sm" id="nav-avatar"><span id="nav-initials">?</span></div>
+    <button class="btn-signout" onclick="signOut()">Sair</button>
+  </div>
+</nav>
+
+<!-- ══ PERFIL ════════════════════════════════════════════ -->
+<div id="view-perfil" class="view active">
+  <div class="page-title">Meu perfil</div>
+  <div class="page-sub">Identidade e informações do atleta</div>
+
+  <!-- Card FIFA -->
+  <div class="fifa-wrap" id="fifa-card">
+    <div class="fifa-top">
+      <div class="fifa-left">
+        <div class="fifa-pos">11</div>
+        <div class="fifa-ovr" id="fc-ovr">—</div>
+      </div>
+      <div style="flex:1">
+        <div class="fifa-name" id="fc-name">ATLETA</div>
+        <div class="fifa-attrs">
+          <div class="fa"><span class="fa-val" id="fc-vel" style="color:var(--green)">—</span><div class="fa-bar"><div class="fa-fill" id="fb-vel" style="background:var(--green);width:0%"></div></div><span class="fa-lbl">VEL</span></div>
+          <div class="fa"><span class="fa-val" id="fc-for" style="color:var(--accent)">—</span><div class="fa-bar"><div class="fa-fill" id="fb-for" style="background:var(--accent);width:0%"></div></div><span class="fa-lbl">FOR</span></div>
+          <div class="fa"><span class="fa-val" id="fc-fin" style="color:var(--amber)">—</span><div class="fa-bar"><div class="fa-fill" id="fb-fin" style="background:var(--amber);width:0%"></div></div><span class="fa-lbl">FIN</span></div>
+          <div class="fa"><span class="fa-val" id="fc-res" style="color:var(--purple)">—</span><div class="fa-bar"><div class="fa-fill" id="fb-res" style="background:var(--purple);width:0%"></div></div><span class="fa-lbl">RES</span></div>
+          <div class="fa"><span class="fa-val" id="fc-def" style="color:var(--red)">—</span><div class="fa-bar"><div class="fa-fill" id="fb-def" style="background:var(--red);width:0%"></div></div><span class="fa-lbl">DEF</span></div>
+          <div class="fa"><span class="fa-val" id="fc-aer" style="color:var(--teal)">—</span><div class="fa-bar"><div class="fa-fill" id="fb-aer" style="background:var(--teal);width:0%"></div></div><span class="fa-lbl">AÉR</span></div>
+        </div>
+        <div class="tier-badge" id="fc-tier" style="display:none"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Dados pessoais -->
+  <div class="card">
+    <div class="card-title">Identidade</div>
+    <div class="field-grid">
+      <div class="field field-full"><label>Nome completo</label><input type="text" id="p-nome" placeholder="Seu nome completo"></div>
+      <div class="field"><label>Data de nascimento</label><input type="date" id="p-nasc"></div>
+      <div class="field"><label>Nacionalidade</label><input type="text" id="p-nac" placeholder="Brasileira"></div>
+      <div class="field"><label>Posição principal</label>
+        <select id="p-pos">
+          <option value="11">Ponta esquerda (11)</option>
+          <option value="14">Ponta direita (14)</option>
+          <option value="15">Fullback (15)</option>
+          <option value="12">Centre (12)</option>
+          <option value="13">Centre (13)</option>
+        </select>
+      </div>
+      <div class="field"><label>Clube atual</label><input type="text" id="p-clube" placeholder="Nome do clube"></div>
+      <div class="field"><label>Nível competitivo</label>
+        <select id="p-nivel">
+          <option value="sub20">Sub-20</option>
+          <option value="amador" selected>Amateur / clubes</option>
+          <option value="semi">Semiprofissional</option>
+          <option value="pro">Profissional</option>
+          <option value="selecao">Seleção nacional</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Medidas físicas</div>
+    <div class="field-grid">
+      <div class="field"><label>Altura (cm)</label><input type="number" id="p-alt" placeholder="184" min="150" max="220"></div>
+      <div class="field"><label>Peso atual (kg)</label><input type="number" id="p-peso" placeholder="90" min="50" max="160" step="0.1"></div>
+      <div class="field"><label>Envergadura (cm)</label><input type="number" id="p-env" placeholder="190" min="150" max="230"></div>
+      <div class="field"><label>% gordura estimada</label><input type="number" id="p-bf" placeholder="12" min="4" max="35" step="0.5"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Histórico no rugby</div>
+    <div class="field-grid">
+      <div class="field"><label>Ano de início</label><input type="number" id="p-inicio" placeholder="2018" min="1990" max="2025"></div>
+      <div class="field"><label>Clubes anteriores</label><input type="text" id="p-ant" placeholder="Ex: Niterói RC, Curitiba RC"></div>
+      <div class="field field-full"><label>Convocações / seleção</label><input type="text" id="p-conv" placeholder="Ex: Seleção SP 2023, 2024"></div>
+    </div>
+  </div>
+
+  <div class="btn-row">
+    <button class="btn btn-primary" onclick="savePerfil()">Salvar perfil</button>
+  </div>
+</div>
+
+<!-- ══ DASHBOARD ═══════════════════════════════════════ -->
+<div id="view-dashboard" class="view">
+  <div class="page-title">Dashboard</div>
+  <div class="page-sub" id="dash-sub">Médias e evolução da temporada</div>
+  <div id="dash-empty" class="empty" style="display:none">
+    <div class="empty-icon">📊</div>
+    <div class="empty-title">Sem dados ainda</div>
+    <div class="empty-text">Registre partidas, treinos ou testes para ver as métricas aqui.</div>
+  </div>
+  <div id="dash-content">
+    <div class="section-label">Atributos do card</div>
+    <div class="kpi-grid" id="dash-kpis"></div>
+    <div class="card"><div class="card-title">Metros carregados por partida</div><div class="card-sub">Evolução · alvo: 30m+ (linha laranja)</div><div class="chart-wrap" style="height:170px"><canvas id="ch-metros"></canvas></div></div>
+    <div class="card"><div class="card-title">Tackles — completados vs falhados</div><div class="card-sub">Por partida · verde = completados · vermelho = falhados</div><div class="chart-wrap" style="height:170px"><canvas id="ch-tackles"></canvas></div></div>
+    <div class="card"><div class="card-title">1RM agachamento — progressão</div><div class="card-sub">Via diário de treinos (Epley)</div><div class="chart-wrap" style="height:170px"><canvas id="ch-squat"></canvas></div></div>
+  </div>
+</div>
+
+<!-- ══ TREINOS ══════════════════════════════════════════ -->
+<div id="view-treinos" class="view">
+  <div class="page-title">Diário de treinos</div>
+  <div class="page-sub">Escreva como quiser — a IA interpreta e estrutura automaticamente</div>
+
+  <div class="tip-box">
+    Exemplos aceitos: <strong>agachamento 4x8 120kg</strong> · <strong>terra 3 series 5 reps 140kg</strong> · <strong>supino: 5×5 100kg / 3×8 85kg</strong>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Dados da sessão</div>
+    <div class="field-grid">
+      <div class="field"><label>Data</label><input type="date" id="tr-data"></div>
+      <div class="field"><label>Tipo</label>
+        <select id="tr-tipo">
+          <option value="forca">Força / musculação</option>
+          <option value="velocidade">Velocidade / sprint</option>
+          <option value="resistencia">Resistência / cardio</option>
+          <option value="tecnico">Técnico / rugby</option>
+          <option value="hibrido">Híbrido</option>
+        </select>
+      </div>
+      <div class="field"><label>RPE (1–10)</label><input type="number" id="tr-rpe" placeholder="7" min="1" max="10" step="0.5"></div>
+      <div class="field"><label>Duração (min)</label><input type="number" id="tr-dur" placeholder="75" min="10" max="300"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Anotação livre</div>
+    <div class="card-sub">Cole ou escreva sua lista de exercícios</div>
+    <div class="field"><textarea id="tr-texto" rows="5" placeholder="Ex:
+Agachamento livre 4x8 120kg
+Power clean 4x3 80kg
+Supino reto 4x10 80kg
+Pull-up 3x12
+Nota: bom treino, foco em explosão"></textarea></div>
+    <div class="btn-row" style="margin-top:.5rem">
+      <button class="btn btn-primary" id="btn-parse" onclick="parseTreino()">◈ Interpretar com IA</button>
+      <button class="btn btn-ghost" onclick="clearTreino()">Limpar</button>
+    </div>
+    <div id="tr-status" style="display:none;align-items:center;gap:8px;font-size:12px;color:var(--muted);padding:8px 0"></div>
+  </div>
+
+  <div id="tr-preview" style="display:none">
+    <div class="card">
+      <div class="card-title">Sessão interpretada</div>
+      <div class="card-sub" id="tr-obs-preview"></div>
+      <div id="tr-exercises-preview"></div>
+      <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-top:10px">
+        <span>Volume total: <strong id="tr-vol-preview" style="color:var(--text)">—</strong></span>
+        <span>Melhor 1RM: <strong id="tr-rm-preview" style="color:var(--green)">—</strong></span>
+      </div>
+      <div class="btn-row" style="margin-top:.75rem">
+        <button class="btn btn-primary" onclick="saveTreino()">✓ Confirmar e salvar</button>
+        <button class="btn btn-ghost" onclick="resetTreinoPreview()">Editar</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-label">Histórico de sessões</div>
+  <div id="tr-hist"></div>
+</div>
+
+<!-- ══ TESTES ═══════════════════════════════════════════ -->
+<div id="view-testes" class="view">
+  <div class="page-title">Testes periódicos</div>
+  <div class="page-sub">Protocolo toda sexta-feira — sequência obrigatória</div>
+
+  <div class="card">
+    <div class="card-title">Data e contexto</div>
+    <div class="field-grid">
+      <div class="field"><label>Data</label><input type="date" id="ts-data"></div>
+      <div class="field"><label>Superfície</label>
+        <select id="ts-sup"><option value="grama">Grama natural</option><option value="sint">Grama sintética</option><option value="tartan">Tartan</option><option value="concreto">Concreto</option></select>
+      </div>
+      <div class="field"><label>Condição física</label>
+        <select id="ts-cond"><option value="otima">Ótima</option><option value="boa">Boa</option><option value="cansado">Cansado</option><option value="desconforto">Com desconforto</option></select>
+      </div>
+      <div class="field"><label>Peso corporal (kg)</label><input type="number" id="ts-pc" placeholder="90" min="50" max="160" oninput="recalcTestes()"></div>
+    </div>
+  </div>
+
+  <!-- CMJ -->
+  <div class="test-block" id="tb-cmj">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start">
+      <div style="flex:1">
+        <div class="test-name">1 — CMJ salto vertical <span class="attr-pill" style="background:var(--teal-dim);color:var(--teal)">AÉR · FOR</span></div>
+        <div class="test-proto">3 tentativas · registre a maior · pausa 60s · app Phyphox ou câmera lenta</div>
+        <div class="field-grid" style="margin-top:6px">
+          <div class="field"><label>Altura máxima (cm)</label><input type="number" id="ts-cmj" placeholder="38" min="10" max="90" step="0.5" oninput="recalcTestes()"></div>
+        </div>
+      </div>
+      <div style="text-align:right;padding-left:10px">
+        <div class="score-pill" id="sc-cmj" style="color:var(--muted)">—</div>
+        <div style="font-size:10px;color:var(--dim)">/99</div>
+      </div>
+    </div>
+    <div class="bench-row"><span class="bench-chip">Elite: <b>48cm+</b></span><span class="bench-chip">Bom: <b>40–47cm</b></span></div>
+    <div class="pbar"><div class="pfill" id="pb-cmj" style="width:0%;background:var(--teal)"></div></div>
+  </div>
+
+  <!-- Sprint -->
+  <div class="test-block" id="tb-spr">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start">
+      <div style="flex:1">
+        <div class="test-name">2 — Sprint 10m + 40m <span class="attr-pill" style="background:var(--accent-dim);color:var(--accent)">VEL</span></div>
+        <div class="test-proto">3 tentativas · melhor tempo · pausa 3min completo · saída em pé</div>
+        <div class="field-grid" style="margin-top:6px">
+          <div class="field"><label>Tempo 10m (seg)</label><input type="number" id="ts-10m" placeholder="1.72" min="1.3" max="2.5" step="0.01" oninput="recalcTestes()"></div>
+          <div class="field"><label>Tempo 40m (seg)</label><input type="number" id="ts-40m" placeholder="5.10" min="4.0" max="7.0" step="0.01" oninput="recalcTestes()"></div>
+        </div>
+      </div>
+      <div style="text-align:right;padding-left:10px">
+        <div class="score-pill" id="sc-spr" style="color:var(--muted)">—</div>
+        <div style="font-size:10px;color:var(--dim)">/99</div>
+      </div>
+    </div>
+    <div class="bench-row"><span class="bench-chip">10m elite: <b>sub 1.65s</b></span><span class="bench-chip">40m elite: <b>sub 4.80s</b></span></div>
+    <div class="pbar"><div class="pfill" id="pb-spr" style="width:0%;background:var(--accent)"></div></div>
+  </div>
+
+  <!-- 505 -->
+  <div class="test-block" id="tb-505">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start">
+      <div style="flex:1">
+        <div class="test-name">3 — 505 Agility test <span class="attr-pill" style="background:var(--accent-dim);color:var(--accent)">VEL — COD</span></div>
+        <div class="test-proto">2 tentativas por perna · melhor tempo · pausa 2min</div>
+        <div class="field-grid" style="margin-top:6px">
+          <div class="field"><label>Perna dominante (seg)</label><input type="number" id="ts-505d" placeholder="2.40" min="1.8" max="3.5" step="0.01" oninput="recalcTestes()"></div>
+          <div class="field"><label>Perna não-dominante</label><input type="number" id="ts-505nd" placeholder="2.50" min="1.8" max="3.5" step="0.01" oninput="recalcTestes()"></div>
+        </div>
+      </div>
+      <div style="text-align:right;padding-left:10px">
+        <div class="score-pill" id="sc-505" style="color:var(--muted)">—</div>
+        <div style="font-size:10px;color:var(--dim)">/99</div>
+      </div>
+    </div>
+    <div class="bench-row"><span class="bench-chip">Elite: <b>sub 2.35s</b></span><span class="bench-chip">Bom: <b>2.35–2.55s</b></span></div>
+    <div class="pbar"><div class="pfill" id="pb-505" style="width:0%;background:var(--accent)"></div></div>
+  </div>
+
+  <!-- Força -->
+  <div class="test-block" id="tb-for">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start">
+      <div style="flex:1">
+        <div class="test-name">4 — Bateria de força <span class="attr-pill" style="background:var(--amber-dim);color:var(--amber)">FOR</span></div>
+        <div class="test-proto">1RM estimado via Epley do diário — não faça máximo direto na sexta</div>
+        <div class="field-grid" style="margin-top:6px">
+          <div class="field"><label>Agachamento 1RM (kg)</label><input type="number" id="ts-sq" placeholder="120" min="40" max="350" oninput="recalcTestes()"></div>
+          <div class="field"><label>Supino 1RM (kg)</label><input type="number" id="ts-bp" placeholder="90" min="30" max="250" oninput="recalcTestes()"></div>
+          <div class="field"><label>Pull-up (reps máx.)</label><input type="number" id="ts-pu" placeholder="12" min="0" max="50" oninput="recalcTestes()"></div>
+          <div class="field"><label>Power clean 1RM (kg)</label><input type="number" id="ts-pc2" placeholder="80" min="20" max="200" oninput="recalcTestes()"></div>
+        </div>
+      </div>
+      <div style="text-align:right;padding-left:10px">
+        <div class="score-pill" id="sc-for" style="color:var(--muted)">—</div>
+        <div style="font-size:10px;color:var(--dim)">/99</div>
+      </div>
+    </div>
+    <div class="bench-row">
+      <span class="bench-chip">Agach. elite: <b>1.7–2.0× PC</b></span>
+      <span class="bench-chip">Supino: <b>1.0–1.3×</b></span>
+      <span class="bench-chip">Pull-up: <b>15+ reps</b></span>
+      <span class="bench-chip">P.clean: <b>1.0–1.3×</b></span>
+    </div>
+    <div class="pbar"><div class="pfill" id="pb-for" style="width:0%;background:var(--amber)"></div></div>
+  </div>
+
+  <!-- Bronco -->
+  <div class="test-block" id="tb-res">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start">
+      <div style="flex:1">
+        <div class="test-name">5 — Bronco test 1200m <span class="attr-pill" style="background:var(--purple-dim);color:var(--purple)">RES · SEMPRE POR ÚLTIMO</span></div>
+        <div class="test-proto">5× (20m+40m+60m) sem pausa · descansar 15min antes · cronometrar do início ao fim</div>
+        <div class="field-grid" style="margin-top:6px">
+          <div class="field"><label>Tempo final (min:seg)</label><input type="text" id="ts-bronco" placeholder="4:45" oninput="recalcTestes()"></div>
+        </div>
+      </div>
+      <div style="text-align:right;padding-left:10px">
+        <div class="score-pill" id="sc-res" style="color:var(--muted)">—</div>
+        <div style="font-size:10px;color:var(--dim)">/99</div>
+      </div>
+    </div>
+    <div class="bench-row"><span class="bench-chip">Elite backs Super Rugby: <b>sub 4:30</b></span><span class="bench-chip">Bom: <b>4:30–4:50</b></span><span class="bench-chip">Média: <b>4:57</b></span></div>
+    <div class="pbar"><div class="pfill" id="pb-res" style="width:0%;background:var(--purple)"></div></div>
+  </div>
+
+  <div class="field" style="margin-bottom:.75rem"><label>Observações</label><input type="text" id="ts-obs" placeholder="Ex: vento forte, grama molhada, perna cansada..."></div>
+  <div class="btn-row">
+    <button class="btn btn-primary" onclick="salvarTeste()">Salvar resultados</button>
+    <button class="btn btn-ghost" onclick="limparTestes()">Limpar</button>
+  </div>
+
+  <div class="section-label">Histórico de testes</div>
+  <div id="ts-hist"></div>
+</div>
+
+<!-- ══ PARTIDAS ═════════════════════════════════════════ -->
+<div id="view-partidas" class="view">
+  <div class="page-title">Registrar partida</div>
+  <div class="page-sub">Dados do jogo com análise tática da IA</div>
+
+  <div class="card">
+    <div class="card-title">Informações gerais</div>
+    <div class="field-grid">
+      <div class="field field-full"><label>Adversário *</label><input type="text" id="f-adv" placeholder="Nome do clube ou seleção"></div>
+      <div class="field"><label>Data *</label><input type="date" id="f-data"></div>
+      <div class="field"><label>Resultado</label><input type="text" id="f-resultado" placeholder="Ex: 28-14"></div>
+      <div class="field"><label>Minutos em campo</label><input type="number" id="f-min" placeholder="80" min="1" max="100"></div>
+      <div class="field"><label>Competição</label><input type="text" id="f-comp" placeholder="Ex: Campeonato Paulista"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Ataque</div>
+    <div class="field-grid">
+      <div class="field"><label>Metros carregados</label><input type="number" id="f-metros" placeholder="0" min="0"></div>
+      <div class="field"><label>Carries</label><input type="number" id="f-carries" placeholder="0" min="0"></div>
+      <div class="field"><label>Tries marcados</label><input type="number" id="f-tries" placeholder="0" min="0" max="10"></div>
+      <div class="field"><label>Oportunidades de try</label><input type="number" id="f-oport" placeholder="0" min="0"></div>
+      <div class="field"><label>Line breaks</label><input type="number" id="f-lb" placeholder="0" min="0"></div>
+      <div class="field"><label>Defenders beaten</label><input type="number" id="f-db" placeholder="0" min="0"></div>
+      <div class="field"><label>Offloads tentados</label><input type="number" id="f-offt" placeholder="0" min="0"></div>
+      <div class="field"><label>Offloads completados</label><input type="number" id="f-offc" placeholder="0" min="0"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Defesa</div>
+    <div class="field-grid">
+      <div class="field"><label>Tackles tentados</label><input type="number" id="f-tact" placeholder="0" min="0"></div>
+      <div class="field"><label>Tackles completados</label><input type="number" id="f-tacc" placeholder="0" min="0"></div>
+      <div class="field"><label>Misses campo aberto</label><input type="number" id="f-miss" placeholder="0" min="0"></div>
+      <div class="field"><label>Turnovers causados</label><input type="number" id="f-turn" placeholder="0" min="0"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Jogo aéreo e kicks</div>
+    <div class="field-grid">
+      <div class="field"><label>High balls disputadas</label><input type="number" id="f-hbt" placeholder="0" min="0"></div>
+      <div class="field"><label>High balls ganhas</label><input type="number" id="f-hbc" placeholder="0" min="0"></div>
+      <div class="field"><label>Kicks tentados</label><input type="number" id="f-kickt" placeholder="0" min="0"></div>
+      <div class="field"><label>Kicks precisos</label><input type="number" id="f-kickc" placeholder="0" min="0"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Avaliação pessoal</div>
+    <div class="field-grid">
+      <div class="field"><label>RPE pós-jogo (1–10)</label><input type="number" id="f-rpe" placeholder="7" min="1" max="10" step="0.5"></div>
+      <div class="field"><label>Autoavaliação (1–10)</label><input type="number" id="f-rating" placeholder="7" min="1" max="10" step="0.5"></div>
+      <div class="field field-full"><label>Observações</label><textarea id="f-obs" rows="2" placeholder="Ex: bom 1º tempo, tackle falhado aos 65min..."></textarea></div>
+    </div>
+  </div>
+
+  <div class="btn-row">
+    <button class="btn btn-primary" id="btn-salvar-partida" onclick="salvarPartida()">Salvar e analisar</button>
+    <button class="btn btn-ghost" onclick="clearPartida()">Limpar</button>
+  </div>
+
+  <div id="ai-section" style="display:none">
+    <div class="ai-box">
+      <div class="ai-header">
+        <div class="ai-icon">◈</div>
+        <div><div class="ai-title">Análise tática — IA</div><div class="ai-sub" id="ai-match-label">Partida atual</div></div>
+      </div>
+      <div class="ai-content loading" id="ai-content">Analisando dados da partida...</div>
+    </div>
+  </div>
+
+  <div class="section-label">Partidas registradas</div>
+  <div id="partidas-hist"></div>
+</div>
+
+<!-- ══ PESO ═════════════════════════════════════════════ -->
+<div id="view-peso" class="view">
+  <div class="page-title">Histórico de peso</div>
+  <div class="page-sub">Registro diário com evolução e média móvel</div>
+
+  <div class="kpi-grid" id="peso-kpis">
+    <div class="kpi"><div class="kpi-label">Atual</div><div class="kpi-val" id="pk-atual">—</div><div class="kpi-sub">último registro</div></div>
+    <div class="kpi"><div class="kpi-label">Variação 7d</div><div class="kpi-val" id="pk-7d">—</div><div class="kpi-sub">últimos 7 dias</div></div>
+    <div class="kpi"><div class="kpi-label">Mínimo</div><div class="kpi-val" id="pk-min">—</div><div class="kpi-sub" id="pk-min-d">—</div></div>
+    <div class="kpi"><div class="kpi-label">Máximo</div><div class="kpi-val" id="pk-max">—</div><div class="kpi-sub" id="pk-max-d">—</div></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Registrar peso</div>
+    <div class="card-sub">Prefira medir logo ao acordar, em jejum</div>
+    <div class="field-grid">
+      <div class="field"><label>Data</label><input type="date" id="pw-data"></div>
+      <div class="field"><label>Peso (kg)</label><input type="number" id="pw-peso" placeholder="89.5" step="0.1" min="40" max="200"></div>
+      <div class="field"><label>Peso-alvo (kg)</label><input type="number" id="pw-alvo" placeholder="90" step="0.5" min="40" max="200" oninput="saveAlvo(this.value)"></div>
+    </div>
+    <button class="btn btn-primary" onclick="addPeso()">Salvar registro</button>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Evolução do peso</div>
+    <div class="card-sub">Peso diário (azul) · média 7d (verde) · alvo (laranja)</div>
+    <div class="range-tabs">
+      <button class="rtab active" onclick="setRangePeso(14,this)">14 dias</button>
+      <button class="rtab" onclick="setRangePeso(30,this)">30 dias</button>
+      <button class="rtab" onclick="setRangePeso(90,this)">90 dias</button>
+      <button class="rtab" onclick="setRangePeso(0,this)">Tudo</button>
+    </div>
+    <div class="chart-wrap" style="height:200px"><canvas id="ch-peso"></canvas></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Histórico de registros</div>
+    <div id="peso-hist"></div>
+  </div>
+</div>
+</div><!-- #app -->
+
+<div class="toast" id="toast"></div>
+
+<!-- ══════════════════════════════════════════════════════
+     JAVASCRIPT
+════════════════════════════════════════════════════════ -->
+<script>
+/* ── SUPABASE CONFIG ─────────────────────────────────── */
+// !! SUBSTITUA pelos seus dados do projeto Supabase !!
+const SUPA_URL = 'https://SEU_PROJETO.supabase.co';
+const SUPA_KEY = 'SUA_ANON_KEY';
+
+const { createClient } = supabase;
+const sb = createClient(SUPA_URL, SUPA_KEY);
+
+let currentUser = null;
+
+/* ── AUTH ────────────────────────────────────────────── */
+async function sendMagicLink(){
+  const email = document.getElementById('auth-email').value.trim();
+  if(!email || !email.includes('@')){ showAuthError('Digite um email válido.'); return; }
+  const btn = document.getElementById('btn-magic');
+  btn.disabled = true; btn.textContent = 'Enviando...';
+  const { error } = await sb.auth.signInWithOtp({
+    email,
+    options: { shouldCreateUser: true }
+  });
+  if(error){
+    showAuthError(error.message);
+    btn.disabled = false; btn.textContent = 'Enviar link de acesso';
+  } else {
+    document.getElementById('auth-form').style.display = 'none';
+    document.getElementById('auth-sent-email').textContent = email;
+    document.getElementById('auth-sent').style.display = 'block';
+  }
+}
+
+async function signOut(){
+  await sb.auth.signOut();
+  currentUser = null;
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('auth-screen').style.display = 'flex';
+}
+
+function showAuthError(msg){
+  const el = document.getElementById('auth-error');
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+
+async function initAuth(){
+  const { data: { session } } = await sb.auth.getSession();
+  if(session){
+    currentUser = session.user;
+    bootApp();
+  }
+  sb.auth.onAuthStateChange((event, session) => {
+    if(session && !currentUser){
+      currentUser = session.user;
+      bootApp();
+    }
+  });
+}
+
+function bootApp(){
+  document.getElementById('auth-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  const email = currentUser.email || '?';
+  const initials = email.slice(0,2).toUpperCase();
+  document.getElementById('nav-initials').textContent = initials;
+  loadAll();
+}
+
+/* ── DB HELPERS ──────────────────────────────────────── */
+const uid = () => currentUser?.id;
+
+async function dbGet(table, order='created_at'){
+  const { data, error } = await sb.from(table).select('*').eq('user_id', uid()).order(order);
+  return error ? [] : data;
+}
+async function dbInsert(table, obj){
+  const { data, error } = await sb.from(table).insert({...obj, user_id: uid()}).select().single();
+  return { data, error };
+}
+async function dbDelete(table, id){
+  return sb.from(table).delete().eq('id', id).eq('user_id', uid());
+}
+async function dbUpsert(table, obj){
+  return sb.from(table).upsert({...obj, user_id: uid()}, { onConflict: 'user_id' });
+}
+
+/* ── UTILS ───────────────────────────────────────────── */
+function fmtDate(iso){ if(!iso)return'—'; const[y,m,d]=iso.split('-'); return d+'/'+m+'/'+y; }
+function g(id){ const el=document.getElementById(id); if(!el)return null; const v=el.tagName==='TEXTAREA'?el.value.trim():el.value.trim(); if(!v)return null; return isNaN(v)||el.type==='text'||el.tagName==='TEXTAREA'?v:parseFloat(v); }
+function pct(a,b){ if(!b||b===0)return null; return Math.round(a/b*100); }
+function epley(c,r){ return r===1?c:Math.round(c*(1+r/30)*10)/10; }
+function parseBronco(s){ s=(s||'').trim(); if(s.includes(':')){ const[m,sec]=s.split(':').map(Number); return(!isNaN(m)&&!isNaN(sec))?m*60+sec:null; } const n=parseFloat(s); return isNaN(n)?null:n; }
+function lerp(v,pts){ if(v<=pts[0][0])return pts[0][1]; if(v>=pts[pts.length-1][0])return pts[pts.length-1][1]; for(let i=0;i<pts.length-1;i++){ const[r0,s0]=[pts[i][0],pts[i][1]],[r1,s1]=[pts[i+1][0],pts[i+1][1]]; if(v>=r0&&v<=r1)return Math.round(s0+(s1-s0)*(v-r0)/(r1-r0)); } return pts[0][1]; }
+function showToast(msg,err=false){ const t=document.getElementById('toast'); t.textContent=msg; t.className='toast'+(err?' err':''); t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2800); }
+function showView(id,btn){ document.querySelectorAll('.view').forEach(v=>v.classList.remove('active')); document.querySelectorAll('.nav-tab').forEach(b=>b.classList.remove('active')); document.getElementById('view-'+id).classList.add('active'); btn.classList.add('active'); if(id==='dashboard')renderDashboard(); if(id==='treinos')loadTreinoHist(); if(id==='testes')loadTesteHist(); if(id==='partidas')loadPartidasHist(); if(id==='peso')loadPeso(); if(id==='perfil'){loadPerfil();updateFifaCard();} }
+
+function scoreColor(s){ if(!s&&s!==0)return'var(--muted)'; if(s>=85)return'var(--green)'; if(s>=70)return'var(--accent)'; if(s>=55)return'var(--amber)'; return'var(--red)'; }
+
+/* ── SCORING ─────────────────────────────────────────── */
+const SC = {
+  vel40: v => lerp(-v,[[-4.50,99],[-4.65,94],[-4.80,88],[-4.95,80],[-5.10,72],[-5.30,60],[-5.50,48],[-5.70,38],[-6.00,25]]),
+  cmj:   v => lerp(v,[[15,20],[25,35],[32,50],[38,63],[43,76],[48,88],[55,96],[65,99]]),
+  a505:  v => lerp(-v,[[-1.90,99],[-2.10,94],[-2.25,88],[-2.35,82],[-2.45,74],[-2.55,64],[-2.70,52],[-2.90,38],[-3.20,22]]),
+  sqRel: v => lerp(v,[[0.7,22],[0.9,35],[1.1,48],[1.3,62],[1.5,75],[1.7,87],[1.9,95],[2.1,99]]),
+  bpRel: v => lerp(v,[[0.5,22],[0.65,35],[0.8,50],[0.92,62],[1.05,75],[1.2,87],[1.4,95],[1.6,99]]),
+  pu:    v => lerp(v,[[0,10],[4,25],[7,38],[10,52],[12,65],[15,80],[18,90],[22,99]]),
+  pcRel: v => lerp(v,[[0.4,22],[0.6,35],[0.75,50],[0.88,63],[1.0,76],[1.15,88],[1.3,95],[1.5,99]]),
+  bronco:v => lerp(-v,[[-255,99],[-270,95],[-280,90],[-295,83],[-310,72],[-330,60],[-350,48],[-370,38],[-400,25]]),
+  tack:  v => lerp(v,[[40,20],[55,35],[65,48],[73,60],[80,72],[87,84],[92,93],[97,99]]),
+  fin:   (conv,lb) => Math.round(lerp(conv,[[0,20],[20,35],[40,50],[55,65],[65,78],[75,88],[85,95],[100,99]])*0.6 + lerp(lb,[[0,30],[0.5,42],[1.0,58],[1.5,72],[2.0,84],[2.5,92],[3.5,99]])*0.4),
+};
+
+/* ── LOAD ALL ────────────────────────────────────────── */
+async function loadAll(){
+  await loadPerfil();
+  updateFifaCard();
+}
+
+/* ── PERFIL ──────────────────────────────────────────── */
+let perfilData = {};
+async function loadPerfil(){
+  const { data } = await sb.from('perfil').select('*').eq('user_id', uid()).single();
+  if(data){
+    perfilData = data;
+    const fields = ['nome','nasc','nac','pos','clube','nivel','alt','peso','env','bf','inicio','ant','conv'];
+    fields.forEach(f=>{ const el=document.getElementById('p-'+f); if(el&&data[f]!==null&&data[f]!==undefined) el.value=data[f]; });
+  }
+}
+async function savePerfil(){
+  const obj = {};
+  ['nome','nasc','nac','pos','clube','nivel','alt','peso','env','bf','inicio','ant','conv'].forEach(f=>{
+    const el=document.getElementById('p-'+f); if(el) obj[f]=el.value||null;
+  });
+  const { error } = await dbUpsert('perfil', obj);
+  if(error) showToast('Erro ao salvar: '+error.message, true);
+  else { showToast('Perfil salvo!'); perfilData=obj; updateFifaCard(); }
+}
+
+/* ── FIFA CARD ───────────────────────────────────────── */
+async function updateFifaCard(){
+  const partidas = await dbGet('partidas','data');
+  const testes = await dbGet('testes','data');
+  const nome = (perfilData.nome||document.getElementById('p-nome')?.value||'ATLETA').toUpperCase().split(' ').slice(-1)[0];
+  document.getElementById('fc-name').textContent = nome.slice(0,12);
+
+  const pc = parseFloat(perfilData.peso||document.getElementById('p-peso')?.value||0)||null;
+  const lastTeste = testes.length ? testes[testes.length-1] : null;
+
+  let vel=null,forScore=null,fin=null,res=null,def=null,aer=null;
+
+  if(lastTeste){
+    if(lastTeste.t40) vel = SC.vel40(lastTeste.t40);
+    if(lastTeste.cmj && lastTeste.bronco){
+      aer = Math.round((SC.cmj(lastTeste.cmj)*0.5 + (SC.bronco(lastTeste.bronco)||50)*0.5));
+    } else if(lastTeste.cmj) aer = SC.cmj(lastTeste.cmj);
+    if(lastTeste.bronco) res = SC.bronco(lastTeste.bronco);
+    if(pc && lastTeste.sq && lastTeste.bp && lastTeste.pu !== null && lastTeste.pc2){
+      const sq=SC.sqRel(lastTeste.sq/pc), bp=SC.bpRel(lastTeste.bp/pc), pu=SC.pu(lastTeste.pu), pc2=SC.pcRel(lastTeste.pc2/pc);
+      forScore = Math.round(sq*0.35+bp*0.25+pu*0.20+pc2*0.20);
+    }
+  }
+
+  if(partidas.length){
+    const totTacc=partidas.reduce((a,m)=>a+(m.tacc||0),0);
+    const totTact=partidas.reduce((a,m)=>a+(m.tact||0),0);
+    const totTries=partidas.reduce((a,m)=>a+(m.tries||0),0);
+    const totOport=partidas.reduce((a,m)=>a+(m.oport||0),0);
+    const avgLb=partidas.reduce((a,m)=>a+(m.lb||0),0)/partidas.length;
+    const convP=pct(totTries,totOport)||0;
+    def = SC.tack(pct(totTacc,totTact)||0);
+    fin = SC.fin(convP, avgLb);
+  }
+
+  const attrs = {vel,for:forScore,fin,res,def,aer};
+  const colors = {vel:'var(--green)',for:'var(--accent)',fin:'var(--amber)',res:'var(--purple)',def:'var(--red)',aer:'var(--teal)'};
+
+  Object.entries(attrs).forEach(([k,v])=>{
+    document.getElementById('fc-'+k).textContent = v!==null?v:'—';
+    document.getElementById('fc-'+k).style.color = v!==null?scoreColor(v):'var(--muted)';
+    document.getElementById('fb-'+k).style.width = (v||0)+'%';
+  });
+
+  const filled = Object.values(attrs).filter(v=>v!==null);
+  if(!filled.length){ document.getElementById('fc-ovr').textContent='—'; document.getElementById('fc-tier').style.display='none'; return; }
+  const weights = {vel:1.4,for:0.9,fin:1.3,res:1.1,def:0.9,aer:0.9};
+  let ws=0,wt=0; Object.entries(attrs).forEach(([k,v])=>{ if(v!==null){ws+=v*weights[k];wt+=weights[k];} });
+  const ovr = Math.round(ws/wt);
+  document.getElementById('fc-ovr').textContent = ovr;
+
+  const tier = document.getElementById('fc-tier');
+  tier.style.display='inline-block';
+  if(ovr>=87){tier.textContent='⭐ Elite';tier.style.background='var(--amber-dim)';tier.style.color='var(--amber)';}
+  else if(ovr>=75){tier.textContent='Alto rendimento';tier.style.background='var(--accent-dim)';tier.style.color='var(--accent)';}
+  else if(ovr>=60){tier.textContent='Desenvolvendo';tier.style.background='var(--green-dim)';tier.style.color='var(--green)';}
+  else{tier.textContent='Iniciante';tier.style.background='var(--red-dim)';tier.style.color='var(--red)';}
+}
+
+/* ── DASHBOARD ───────────────────────────────────────── */
+const dashCharts = {};
+function destroyChart(id){ if(dashCharts[id]){dashCharts[id].destroy();delete dashCharts[id];} }
+
+async function renderDashboard(){
+  const partidas = (await dbGet('partidas','data')).sort((a,b)=>a.data.localeCompare(b.data));
+  const testes   = (await dbGet('testes','data')).sort((a,b)=>a.data.localeCompare(b.data));
+  const treinos  = (await dbGet('treinos','created_at')).sort((a,b)=>a.created_at.localeCompare(b.created_at));
+
+  const n = partidas.length;
+  document.getElementById('dash-sub').textContent = n+' partida'+(n!==1?'s':'')+' registrada'+(n!==1?'s':'');
+
+  const avgF = (arr,k) => { const v=arr.map(m=>m[k]).filter(x=>x!=null&&!isNaN(x)); return v.length?(v.reduce((a,b)=>a+b,0)/v.length).toFixed(1):null; };
+  const sumF = (arr,k) => arr.reduce((s,m)=>s+(m[k]||0),0);
+
+  const totTacc=sumF(partidas,'tacc'),totTact=sumF(partidas,'tact');
+  const totTries=sumF(partidas,'tries'),totOport=sumF(partidas,'oport');
+  const avgMetros=avgF(partidas,'metros');
+  const tackP=pct(totTacc,totTact), convP=pct(totTries,totOport);
+  const avgRating=avgF(partidas,'rating');
+
+  const lastTeste = testes.length?testes[testes.length-1]:null;
+  const velScore = lastTeste?.t40?SC.vel40(lastTeste.t40):null;
+  const resScore = lastTeste?.bronco?SC.bronco(lastTeste.bronco):null;
+
+  const kpis = [
+    {label:'Metros/jogo',val:avgMetros?avgMetros+'m':'—',sub:'alvo: 30m+',color:'var(--accent)',bar:Math.min((parseFloat(avgMetros)||0)/50*100,100)},
+    {label:'Tackle %',val:tackP!==null?tackP+'%':'—',sub:totTacc+'/'+totTact,color:tackP>=85?'var(--green)':'var(--red)',bar:tackP||0},
+    {label:'Try conv.',val:convP!==null?convP+'%':'—',sub:totTries+'/'+totOport+' oport.',color:'var(--amber)',bar:convP||0},
+    {label:'VEL (40m)',val:velScore!==null?velScore:'—',sub:lastTeste?.t40?lastTeste.t40+'s':'sem teste',color:'var(--green)',bar:velScore||0},
+    {label:'RES (Bronco)',val:resScore!==null?resScore:'—',sub:lastTeste?.bronco?fmtBronco(lastTeste.bronco):'sem teste',color:'var(--purple)',bar:resScore||0},
+    {label:'Autoaval.',val:avgRating?avgRating+'/10':'—',sub:'média pessoal',color:'var(--accent)',bar:parseFloat(avgRating||0)*10},
+  ];
+
+  document.getElementById('dash-kpis').innerHTML = kpis.map(k=>`
+    <div class="kpi">
+      <div class="kpi-label">${k.label}</div>
+      <div class="kpi-val" style="color:${k.color}">${k.val}</div>
+      <div class="kpi-sub">${k.sub}</div>
+      <div class="kpi-bar"><div class="kpi-fill" style="width:${Math.round(k.bar)}%;background:${k.color}"></div></div>
+    </div>`).join('');
+
+  if(!n){ document.getElementById('dash-empty').style.display='block'; document.getElementById('dash-content').style.display='none'; return; }
+  document.getElementById('dash-empty').style.display='none'; document.getElementById('dash-content').style.display='block';
+
+  const labels = partidas.map(m=>m.adv?.length>8?m.adv.slice(0,8)+'…':m.adv);
+  const gridC='#2a2a2e';
+  Chart.defaults.font.size=11; Chart.defaults.color='#888886';
+
+  destroyChart('metros');
+  dashCharts['metros']=new Chart(document.getElementById('ch-metros'),{type:'bar',data:{labels,datasets:[{data:partidas.map(m=>m.metros||0),backgroundColor:partidas.map(m=>(m.metros||0)>=30?'#4f8ef7cc':'#4f8ef755'),borderRadius:4},{type:'line',data:Array(n).fill(30),borderColor:'#f5a62366',borderDash:[4,3],borderWidth:1.5,pointRadius:0}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false}},y:{grid:{color:gridC},ticks:{callback:v=>v+'m'}}}}});
+
+  destroyChart('tackles');
+  dashCharts['tackles']=new Chart(document.getElementById('ch-tackles'),{type:'bar',data:{labels,datasets:[{label:'Completados',data:partidas.map(m=>m.tacc||0),backgroundColor:'#2dba74cc',borderRadius:4},{label:'Falhados',data:partidas.map(m=>Math.max(0,(m.tact||0)-(m.tacc||0))),backgroundColor:'#e85555cc',borderRadius:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{stacked:true,grid:{display:false}},y:{stacked:true,grid:{color:gridC}}}}});
+
+  const sqPts = treinos.filter(t=>t.exercises&&t.exercises.some(e=>e.name?.includes('Agachamento')&&e.best1rm)).map(t=>({ data:t.created_at?.slice(0,10), val:Math.max(...t.exercises.filter(e=>e.name?.includes('Agachamento')&&e.best1rm).map(e=>e.best1rm)) }));
+  destroyChart('squat');
+  if(sqPts.length) dashCharts['squat']=new Chart(document.getElementById('ch-squat'),{type:'line',data:{labels:sqPts.map(p=>fmtDate(p.data)),datasets:[{data:sqPts.map(p=>p.val),borderColor:'#4f8ef7',backgroundColor:'#4f8ef715',borderWidth:2,pointRadius:4,pointBackgroundColor:'#4f8ef7',tension:0.3,fill:true}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false}},y:{grid:{color:gridC},ticks:{callback:v=>v+'kg'}}}}});
+}
+
+function fmtBronco(secs){ return Math.floor(secs/60)+':'+String(Math.round(secs%60)).padStart(2,'0'); }
+
+/* ── TREINOS ─────────────────────────────────────────── */
+let parsedTreino = null;
+
+async function parseTreino(){
+  const texto = document.getElementById('tr-texto').value.trim();
+  if(!texto){ showToast('Escreva a anotação antes.', true); return; }
+  const btn = document.getElementById('btn-parse');
+  btn.disabled=true;
+  const st = document.getElementById('tr-status');
+  st.style.display='flex';
+  st.innerHTML='<div class="spinner"></div> Interpretando com IA...';
+  document.getElementById('tr-preview').style.display='none';
+
+  const prompt=`Você é um assistente de performance de rugby. Analise esta anotação de treino e extraia os dados estruturados.
+
+ANOTAÇÃO: ${texto}
+
+Responda SOMENTE com JSON válido, sem markdown:
+{
+  "tipo": "forca"|"velocidade"|"resistencia"|"tecnico"|"hibrido",
+  "observacao": "observações gerais ou string vazia",
+  "exercises": [
+    {
+      "name": "nome normalizado em português",
+      "cat": "inferior"|"superior"|"potencia"|"core",
+      "hasLoad": true|false,
+      "series": [{"sets":N,"reps":N,"carga":N}]
+    }
+  ]
+}
+
+Regras: "4x8 120kg" → sets=4,reps=8,carga=120. Cargas diferentes → múltiplas entradas em series. hasLoad=false para peso corporal. Normalize: "agacho"→"Agachamento livre", "terra"→"Levantamento terra", "supino"→"Supino reto", "power clean"→"Power clean". Ignore comentários.`;
+
+  try{
+    const res = await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:1000,messages:[{role:'user',content:prompt}]})
+    });
+    const data = await res.json();
+    const raw = data.content.map(c=>c.text||'').join('');
+    const clean = raw.replace(/```json|```/g,'').trim();
+    const parsed = JSON.parse(clean);
+    parsedTreino = parsed;
+    st.style.display='none';
+    btn.disabled=false;
+    renderTreinoPreview(parsed);
+  }catch(err){
+    st.innerHTML='<span style="color:var(--red)">Erro ao interpretar. Tente novamente.</span>';
+    btn.disabled=false;
+  }
+}
+
+function renderTreinoPreview(parsed){
+  document.getElementById('tr-preview').style.display='block';
+  document.getElementById('tr-obs-preview').textContent = parsed.observacao||'Nenhuma observação identificada.';
+  let totalVol=0, bestRM=0, bestRMName='';
+  const html = parsed.exercises.map((ex,i)=>{
+    const rows = ex.series.map(s=>{
+      const rm = ex.hasLoad&&s.reps&&s.carga?epley(s.carga,s.reps):null;
+      const vol = (s.sets||1)*(s.reps||0)*(s.carga||0);
+      totalVol += vol;
+      if(rm&&rm>bestRM){bestRM=rm;bestRMName=ex.name;}
+      return `<tr><td style="font-size:11px;color:var(--muted);padding:3px 8px 3px 0">${s.sets||1}×${s.reps}</td><td style="font-size:11px;padding:3px 8px 3px 0">${ex.hasLoad?s.carga+'kg':'PC'}</td><td style="font-size:11px;color:var(--green);padding:3px 0">${rm?'≈'+rm+'kg':'—'}</td></tr>`;
+    }).join('');
+    const best = ex.hasLoad?Math.max(0,...ex.series.map(s=>s.reps&&s.carga?epley(s.carga,s.reps):0)):0;
+    return `<div style="background:var(--card2);border-radius:var(--r);padding:10px;margin-bottom:6px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+        <span style="font-size:12px;font-weight:600;color:var(--text)">${ex.name}</span>
+        ${best?`<span style="font-size:10px;color:var(--green)">${best}kg 1RM</span>`:''}
+      </div>
+      <table><thead><tr><th style="font-size:10px;color:var(--dim);padding:0 8px 4px 0;text-align:left">Séries</th><th style="font-size:10px;color:var(--dim);padding:0 8px 4px 0;text-align:left">Carga</th><th style="font-size:10px;color:var(--dim);padding:0;text-align:left">1RM est.</th></tr></thead><tbody>${rows}</tbody></table>
+    </div>`;
+  }).join('');
+  document.getElementById('tr-exercises-preview').innerHTML=html;
+  document.getElementById('tr-vol-preview').textContent = totalVol?Math.round(totalVol).toLocaleString('pt-BR')+' kg':'—';
+  document.getElementById('tr-rm-preview').textContent = bestRM?bestRM+'kg ('+bestRMName+')':'—';
+}
+
+async function saveTreino(){
+  if(!parsedTreino)return;
+  const data = document.getElementById('tr-data').value;
+  if(!data){showToast('Selecione a data.',true);return;}
+  const exData = parsedTreino.exercises.map(ex=>{
+    const series=ex.series;
+    const best1rm=ex.hasLoad&&series.length?Math.max(0,...series.map(s=>s.reps&&s.carga?epley(s.carga,s.reps):0)):null;
+    const volume=series.reduce((acc,s)=>(s.sets||1)*(s.reps||0)*(s.carga||0)+acc,0);
+    return{...ex,best1rm:best1rm||null,volume:Math.round(volume)};
+  });
+  const totalVol=exData.reduce((a,e)=>a+(e.volume||0),0);
+  const obj={data,tipo:parsedTreino.tipo,rpe:g('tr-rpe'),dur:g('tr-dur'),obs:parsedTreino.observacao,texto:document.getElementById('tr-texto').value.trim(),exercises:exData,totalVolume:Math.round(totalVol)};
+  const {error}=await dbInsert('treinos',obj);
+  if(error){showToast('Erro ao salvar.',true);return;}
+  showToast('Treino salvo!');
+  clearTreino();
+  loadTreinoHist();
+}
+
+function clearTreino(){ document.getElementById('tr-texto').value=''; ['tr-rpe','tr-dur'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';}); document.getElementById('tr-preview').style.display='none'; document.getElementById('tr-status').style.display='none'; parsedTreino=null; }
+function resetTreinoPreview(){ document.getElementById('tr-preview').style.display='none'; parsedTreino=null; }
+
+async function loadTreinoHist(){
+  const treinos = (await dbGet('treinos','created_at')).reverse();
+  const c = document.getElementById('tr-hist');
+  if(!treinos.length){c.innerHTML='<div class="empty"><div class="empty-icon">💪</div><div class="empty-title">Nenhuma sessão ainda</div><div class="empty-text">Registre sua primeira sessão acima.</div></div>';return;}
+  const tipos={forca:'Força',velocidade:'Velocidade',resistencia:'Resistência',tecnico:'Técnico',hibrido:'Híbrido'};
+  c.innerHTML=treinos.map(t=>`
+    <div class="hist-item">
+      <div class="hist-date-col">
+        <div class="hist-date">${fmtDate(t.data)}</div>
+        <span class="hist-type-pill" style="background:var(--accent-dim);color:var(--accent)">${tipos[t.tipo]||t.tipo}</span>
+      </div>
+      <div class="hist-body">
+        <div class="hist-title">${(t.exercises||[]).map(e=>e.name).join(', ')}</div>
+        <div class="hist-chips">
+          ${t.dur?`<span class="hist-chip">${t.dur}min</span>`:''}
+          ${t.rpe?`<span class="hist-chip">RPE <strong>${t.rpe}</strong></span>`:''}
+          ${t.totalVolume?`<span class="hist-chip">Vol <strong>${t.totalVolume.toLocaleString('pt-BR')}kg</strong></span>`:''}
+          ${(t.exercises||[]).filter(e=>e.best1rm).map(e=>`<span class="hist-chip">${e.name.split(' ')[0]} <strong>${e.best1rm}kg</strong></span>`).join('')}
+        </div>
+        ${t.obs?`<div style="font-size:10px;color:var(--dim);font-style:italic;margin-top:3px">"${t.obs}"</div>`:''}
+      </div>
+      <button class="btn-del" onclick="delTreino('${t.id}')">×</button>
+    </div>`).join('');
+}
+
+async function delTreino(id){ if(!confirm('Remover sessão?'))return; await dbDelete('treinos',id); loadTreinoHist(); showToast('Sessão removida.'); }
+
+/* ── TESTES ──────────────────────────────────────────── */
+function recalcTestes(){
+  const pc=parseFloat(document.getElementById('ts-pc').value)||null;
+  const cmj=parseFloat(document.getElementById('ts-cmj').value)||null;
+  const t40=parseFloat(document.getElementById('ts-40m').value)||null;
+  const a505=parseFloat(document.getElementById('ts-505d').value)||null;
+  const sq=parseFloat(document.getElementById('ts-sq').value)||null;
+  const bp=parseFloat(document.getElementById('ts-bp').value)||null;
+  const pu=parseFloat(document.getElementById('ts-pu').value);
+  const pc2=parseFloat(document.getElementById('ts-pc2').value)||null;
+  const broncoStr=document.getElementById('ts-bronco').value;
+  const bronco=parseBronco(broncoStr);
+
+  const setScore=(id,pbId,val,color)=>{
+    const el=document.getElementById(id),pb=document.getElementById(pbId);
+    if(val!==null){el.textContent=val;el.style.color=scoreColor(val);pb.style.width=val+'%';pb.style.background=color;document.getElementById(pbId.replace('pb-','tb-').replace('pb','tb')||'')?.classList.add('filled');}
+    else{el.textContent='—';el.style.color='var(--muted)';pb.style.width='0%';}
+  };
+
+  if(cmj!==null) setScore('sc-cmj','pb-cmj',SC.cmj(cmj),'var(--teal)');
+  if(t40!==null) setScore('sc-spr','pb-spr',SC.vel40(t40),'var(--accent)');
+  if(a505!==null) setScore('sc-505','pb-505',SC.a505(a505),'var(--accent)');
+  if(bronco!==null) setScore('sc-res','pb-res',SC.bronco(bronco),'var(--purple)');
+
+  if(pc&&(sq||bp||!isNaN(pu)||pc2)){
+    const scores=[];
+    if(sq) scores.push([SC.sqRel(sq/pc),0.35]);
+    if(bp) scores.push([SC.bpRel(bp/pc),0.25]);
+    if(!isNaN(pu)&&pu>=0) scores.push([SC.pu(pu),0.20]);
+    if(pc2) scores.push([SC.pcRel(pc2/pc),0.20]);
+    if(scores.length){const ws=scores.reduce((a,[v,w])=>a+v*w,0),wt=scores.reduce((a,[,w])=>a+w,0);setScore('sc-for','pb-for',Math.round(ws/wt),'var(--amber)');}
+  }
+}
+
+async function salvarTeste(){
+  const data=document.getElementById('ts-data').value;
+  if(!data){showToast('Selecione a data.',true);return;}
+  const pc=parseFloat(document.getElementById('ts-pc').value)||null;
+  const cmj=parseFloat(document.getElementById('ts-cmj').value)||null;
+  const t10=parseFloat(document.getElementById('ts-10m').value)||null;
+  const t40=parseFloat(document.getElementById('ts-40m').value)||null;
+  const a505d=parseFloat(document.getElementById('ts-505d').value)||null;
+  const a505nd=parseFloat(document.getElementById('ts-505nd').value)||null;
+  const sq=parseFloat(document.getElementById('ts-sq').value)||null;
+  const bp=parseFloat(document.getElementById('ts-bp').value)||null;
+  const pu=parseFloat(document.getElementById('ts-pu').value);
+  const pc2=parseFloat(document.getElementById('ts-pc2').value)||null;
+  const broncoStr=document.getElementById('ts-bronco').value;
+  const bronco=parseBronco(broncoStr)||null;
+
+  if(!cmj&&!t40&&!sq&&!bronco){showToast('Registre ao menos um resultado.',true);return;}
+
+  const scores={};
+  if(cmj) scores.cmj=SC.cmj(cmj);
+  if(t40) scores.vel=SC.vel40(t40);
+  if(a505d) scores.a505=SC.a505(a505d);
+  if(bronco) scores.res=SC.bronco(bronco);
+  if(pc&&sq&&bp&&!isNaN(pu)&&pc2) scores.for=Math.round(SC.sqRel(sq/pc)*0.35+SC.bpRel(bp/pc)*0.25+SC.pu(pu)*0.20+SC.pcRel(pc2/pc)*0.20);
+
+  const obj={data,sup:document.getElementById('ts-sup').value,cond:document.getElementById('ts-cond').value,obs:document.getElementById('ts-obs').value,pc,cmj,t10,t40,a505d,a505nd,sq,bp,pu:!isNaN(pu)?pu:null,pc2,bronco,broncoStr,scores};
+  const {error}=await dbInsert('testes',obj);
+  if(error){showToast('Erro ao salvar.',true);return;}
+  showToast('Testes salvos!');
+  limparTestes();
+  loadTesteHist();
+  updateFifaCard();
+}
+
+function limparTestes(){['ts-cmj','ts-10m','ts-40m','ts-505d','ts-505nd','ts-sq','ts-bp','ts-pu','ts-pc2','ts-bronco','ts-obs'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});['cmj','spr','505','for','res'].forEach(k=>{const sc=document.getElementById('sc-'+k),pb=document.getElementById('pb-'+k);if(sc){sc.textContent='—';sc.style.color='var(--muted)';}if(pb)pb.style.width='0%';});}
+
+async function loadTesteHist(){
+  const testes=(await dbGet('testes','data')).reverse();
+  const c=document.getElementById('ts-hist');
+  if(!testes.length){c.innerHTML='<div class="empty"><div class="empty-icon">⏱️</div><div class="empty-title">Nenhum teste ainda</div><div class="empty-text">Registre seus primeiros resultados acima.</div></div>';return;}
+  c.innerHTML=testes.map(t=>{
+    const chips=[];
+    if(t.cmj)chips.push(`CMJ <strong>${t.cmj}cm</strong>`+(t.scores?.cmj?` · <strong style="color:var(--green)">${t.scores.cmj}</strong>`:''));
+    if(t.t40)chips.push(`40m <strong>${t.t40}s</strong>`+(t.scores?.vel?` · <strong style="color:var(--green)">${t.scores.vel}</strong>`:''));
+    if(t.a505d)chips.push(`505 <strong>${t.a505d}s</strong>`);
+    if(t.sq)chips.push(`Agach. <strong>${t.sq}kg</strong>`);
+    if(t.broncoStr)chips.push(`Bronco <strong>${t.broncoStr}</strong>`+(t.scores?.res?` · <strong style="color:var(--purple)">${t.scores.res}</strong>`:''));
+    return`<div class="hist-item">
+      <div class="hist-date-col"><div class="hist-date">${fmtDate(t.data)}</div><div style="font-size:10px;color:var(--dim);margin-top:2px">${t.cond||''}</div></div>
+      <div class="hist-body">
+        <div class="hist-chips">${chips.map(c=>`<span class="hist-chip">${c}</span>`).join('')}</div>
+        ${t.obs?`<div style="font-size:10px;color:var(--dim);font-style:italic;margin-top:3px">"${t.obs}"</div>`:''}
+      </div>
+      <button class="btn-del" onclick="delTeste('${t.id}')">×</button>
+    </div>`;
+  }).join('');
+}
+
+async function delTeste(id){if(!confirm('Remover?'))return;await dbDelete('testes',id);loadTesteHist();showToast('Removido.');}
+document.addEventListener('DOMContentLoaded',()=>{const el=document.getElementById('ts-data');if(el)el.valueAsDate=new Date();});
+
+/* ── PARTIDAS ────────────────────────────────────────── */
+function buildMatchObj(){
+  return{adv:g('f-adv'),data:g('f-data'),resultado:g('f-resultado')||'—',min:g('f-min')||80,comp:g('f-comp')||'',metros:g('f-metros')||0,carries:g('f-carries')||0,tries:g('f-tries')||0,oport:g('f-oport')||0,lb:g('f-lb')||0,db:g('f-db')||0,offt:g('f-offt')||0,offc:g('f-offc')||0,tact:g('f-tact')||0,tacc:g('f-tacc')||0,miss:g('f-miss')||0,turn:g('f-turn')||0,hbt:g('f-hbt')||0,hbc:g('f-hbc')||0,kickt:g('f-kickt')||0,kickc:g('f-kickc')||0,rpe:g('f-rpe'),rating:g('f-rating'),obs:g('f-obs')||''};
+}
+
+async function salvarPartida(){
+  const adv=g('f-adv'),data=g('f-data');
+  if(!adv||!data){showToast('Preencha adversário e data.',true);return;}
+  const match=buildMatchObj();
+  const {data:saved,error}=await dbInsert('partidas',match);
+  if(error){showToast('Erro ao salvar.',true);return;}
+  showToast('Partida salva!');
+  const btn=document.getElementById('btn-salvar-partida');
+  btn.disabled=true;btn.textContent='Analisando...';
+  document.getElementById('ai-section').style.display='block';
+  document.getElementById('ai-match-label').textContent='vs '+adv+' · '+fmtDate(data);
+  const contentEl=document.getElementById('ai-content');
+  contentEl.className='ai-content loading';contentEl.textContent='';
+  const allPartidas=await dbGet('partidas','data');
+  await streamAnalysis(buildMatchPrompt(match,allPartidas),contentEl);
+  btn.disabled=false;btn.textContent='Salvar e analisar';
+  loadPartidasHist();
+  updateFifaCard();
+}
+
+function buildMatchPrompt(match,allMatches){
+  const n=allMatches.length;
+  const tackP=pct(match.tacc,match.tact),convP=pct(match.tries,match.oport),hbP=pct(match.hbc,match.hbt),offP=pct(match.offc,match.offt);
+  const mpc=match.carries>0?(match.metros/match.carries).toFixed(1):'não informado';
+  const avgMetros=n>1?(allMatches.reduce((s,m)=>s+(m.metros||0),0)/n).toFixed(1):null;
+  return`Você é um Analista de Performance e Coach Tático de Rugby especializado em Left Wing (Ponta Esquerda, camisa 11). Analise os dados desta partida.
+
+DADOS DA PARTIDA:
+Adversário: ${match.adv} | Data: ${fmtDate(match.data)} | Resultado: ${match.resultado} | Minutos: ${match.min}min
+
+ATAQUE: Metros: ${match.metros}m (${mpc}m/carry) | Carries: ${match.carries} | Line breaks: ${match.lb} | Defenders beaten: ${match.db}
+Tries: ${match.tries}/${match.oport} oportunidades (${convP!==null?convP+'%':'sem dados'}) | Offloads: ${match.offc}/${match.offt} (${offP!==null?offP+'%':'sem dados'})
+
+DEFESA: Tackles: ${match.tacc}/${match.tact} (${tackP!==null?tackP+'%':'sem dados'}) | Misses campo aberto: ${match.miss} | Turnovers: ${match.turn}
+
+JOGO AÉREO: High balls: ${match.hbc}/${match.hbt} (${hbP!==null?hbP+'%':'sem dados'}) | Kicks precisos: ${match.kickc}/${match.kickt}
+
+PERCEPÇÃO: RPE: ${match.rpe||'não informado'}/10 | Autoavaliação: ${match.rating||'não informado'}/10
+Observações: ${match.obs||'nenhuma'}
+
+${avgMetros?'CONTEXTO: '+n+' jogos. Média de metros: '+avgMetros+'m/jogo.':'Primeira partida registrada.'}
+
+BENCHMARKS ELITE: metros ≥38m, tackle% ≥87%, try conversion ≥65%, high ball% ≥80%, defenders beaten ≥2.0/jogo.
+
+Responda em português, estruturado assim:
+
+**RESUMO DO JOGO** (2-3 frases objetivas)
+
+**PONTOS FORTES** (com dados específicos)
+
+**PONTOS CRÍTICOS** (com causa raiz)
+
+**AJUSTE TÁTICO PRIORITÁRIO** (1 coisa concreta para o próximo treino)
+
+Máximo 320 palavras. Tom direto e técnico.`;
+}
+
+async function streamAnalysis(prompt,targetEl){
+  targetEl.className='ai-content';
+  targetEl.innerHTML='<span class="cursor"></span>';
+  try{
+    const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:1000,stream:true,messages:[{role:'user',content:prompt}]})});
+    const reader=res.body.getReader(),decoder=new TextDecoder();
+    let buffer='',text='';
+    while(true){
+      const{done,value}=await reader.read();if(done)break;
+      buffer+=decoder.decode(value,{stream:true});
+      const lines=buffer.split('\n');buffer=lines.pop();
+      for(const line of lines){
+        if(!line.startsWith('data: '))continue;
+        const d=line.slice(6).trim();if(d==='[DONE]')continue;
+        try{const j=JSON.parse(d);if(j.type==='content_block_delta'&&j.delta?.text){text+=j.delta.text;targetEl.innerHTML=formatAI(text)+'<span class="cursor"></span>';}}catch(e){}
+      }
+    }
+    targetEl.innerHTML=formatAI(text);
+  }catch(err){targetEl.className='ai-content';targetEl.textContent='Erro de conexão. Tente novamente.';}
+}
+
+function formatAI(text){ return text.replace(/\*\*(.+?)\*\*/g,'<strong style="color:var(--text)">$1</strong>').replace(/\n\n/g,'</p><p style="margin-top:.6rem">').replace(/\n/g,'<br>').replace(/^/,'<p>').replace(/$/,'</p>'); }
+
+function clearPartida(){['f-adv','f-data','f-resultado','f-min','f-comp','f-metros','f-carries','f-tries','f-oport','f-lb','f-db','f-offt','f-offc','f-tact','f-tacc','f-miss','f-turn','f-hbt','f-hbc','f-kickt','f-kickc','f-rpe','f-rating','f-obs'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});document.getElementById('ai-section').style.display='none';}
+
+async function loadPartidasHist(){
+  const partidas=(await dbGet('partidas','data')).reverse();
+  const c=document.getElementById('partidas-hist');
+  if(!partidas.length){c.innerHTML='<div class="empty"><div class="empty-icon">🏉</div><div class="empty-title">Nenhuma partida ainda</div><div class="empty-text">Registre seu primeiro jogo acima.</div></div>';return;}
+  c.innerHTML=partidas.map(m=>{
+    const tp=pct(m.tacc,m.tact);
+    const rc=!m.rating?'':m.rating>=8?'var(--green)':m.rating>=6.5?'var(--accent)':'var(--amber)';
+    return`<div class="match-item">
+      <div class="match-header">
+        <div><div class="match-name">${m.adv} <span style="font-weight:400;color:var(--muted)">· ${m.resultado}</span></div><div class="match-date">${fmtDate(m.data)}${m.comp?' · '+m.comp:''} · ${m.min}min</div></div>
+        <div style="display:flex;align-items:center;gap:8px">${m.rating?`<span style="font-size:17px;font-weight:700;color:${rc}">${m.rating}</span>`:''}<button class="btn-del" onclick="delPartida('${m.id}')">×</button></div>
+      </div>
+      <div class="match-stats">
+        <span class="match-stat"><strong>${m.metros||0}m</strong> carregados</span>
+        <span class="match-stat"><strong>${m.tries||0}</strong> tries</span>
+        ${tp!==null?`<span class="match-stat"><strong>${tp}%</strong> tackle</span>`:''}
+        <span class="match-stat"><strong>${m.lb||0}</strong> line breaks</span>
+        <span class="match-stat"><strong>${m.db||0}</strong> def. beaten</span>
+      </div>
+      ${m.obs?`<div style="margin-top:6px;font-size:11px;color:var(--dim);font-style:italic">"${m.obs}"</div>`:''}
+    </div>`;
+  }).join('');
+}
+
+async function delPartida(id){if(!confirm('Remover esta partida?'))return;await dbDelete('partidas',id);loadPartidasHist();updateFifaCard();showToast('Partida removida.');}
+
+/* ── PESO ────────────────────────────────────────────── */
+let pesoChart=null,pesoRange=14,pesoAlvo=null;
+
+function saveAlvo(v){if(v){pesoAlvo=parseFloat(v);localStorage.setItem('w11_alvo',v);}}
+
+async function addPeso(){
+  const data=document.getElementById('pw-data').value;
+  const peso=parseFloat(document.getElementById('pw-peso').value);
+  if(!data||isNaN(peso)||peso<30){showToast('Preencha data e peso válidos.',true);return;}
+  const {error}=await dbInsert('peso',{data,peso:Math.round(peso*10)/10});
+  if(error){showToast('Erro ao salvar.',true);return;}
+  document.getElementById('pw-peso').value='';
+  showToast('Peso registrado!');
+  loadPeso();
+}
+
+async function loadPeso(){
+  const all=(await dbGet('peso','data')).sort((a,b)=>a.data.localeCompare(b.data));
+  const alvoSaved=localStorage.getItem('w11_alvo');
+  if(alvoSaved){pesoAlvo=parseFloat(alvoSaved);document.getElementById('pw-alvo').value=alvoSaved;}
+
+  if(!all.length){
+    ['pk-atual','pk-7d','pk-min','pk-max'].forEach(id=>{const el=document.getElementById(id);if(el)el.textContent='—';});
+    renderPesoChart([]);renderPesoHist([]);return;
+  }
+  const last=all[all.length-1];
+  document.getElementById('pk-atual').textContent=last.peso+' kg';
+  const now=new Date(),daysAgo=n=>{const d=new Date(now);d.setDate(d.getDate()-n);return d.toISOString().slice(0,10);};
+  const e7=all.filter(e=>e.data>=daysAgo(7))[0];
+  const k7=document.getElementById('pk-7d');
+  if(e7){const d=Math.round((last.peso-e7.peso)*10)/10;k7.textContent=(d>0?'+':'')+d+' kg';k7.style.color=d<0?'var(--green)':d>0?'var(--red)':'var(--text)';}
+  else k7.textContent='—';
+  const pesos=all.map(e=>e.peso);
+  const minI=pesos.indexOf(Math.min(...pesos)),maxI=pesos.indexOf(Math.max(...pesos));
+  document.getElementById('pk-min').textContent=pesos[minI]+' kg';
+  document.getElementById('pk-min-d').textContent=fmtDate(all[minI].data);
+  document.getElementById('pk-max').textContent=pesos[maxI]+' kg';
+  document.getElementById('pk-max-d').textContent=fmtDate(all[maxI].data);
+  renderPesoChart(all);
+  renderPesoHist(all);
+}
+
+function setRangePeso(days,btn){pesoRange=days;document.querySelectorAll('.rtab').forEach(b=>b.classList.remove('active'));btn.classList.add('active');dbGet('peso','data').then(all=>renderPesoChart(all.sort((a,b)=>a.data.localeCompare(b.data))));}
+
+function renderPesoChart(all){
+  const entries=pesoRange===0?all:all.filter(e=>{const c=new Date();c.setDate(c.getDate()-pesoRange);return e.data>=c.toISOString().slice(0,10);});
+  if(pesoChart){pesoChart.destroy();pesoChart=null;}
+  const labels=entries.map(e=>fmtDate(e.data));
+  const pesos=entries.map(e=>e.peso);
+  const ma7=entries.map((_,i)=>{const sl=entries.slice(Math.max(0,i-6),i+1);return Math.round(sl.reduce((s,x)=>s+x.peso,0)/sl.length*10)/10;});
+  const datasets=[{label:'Peso',data:pesos,borderColor:'#4f8ef7',backgroundColor:'#4f8ef722',borderWidth:2,pointRadius:entries.length>30?2:4,pointBackgroundColor:'#4f8ef7',tension:0.3,fill:true,order:2},{label:'Média 7d',data:ma7,borderColor:'#2dba74',borderWidth:2,pointRadius:0,tension:0.4,fill:false,order:1}];
+  if(pesoAlvo) datasets.push({label:'Alvo',data:Array(entries.length).fill(pesoAlvo),borderColor:'#f5a623',borderDash:[5,4],borderWidth:1.5,pointRadius:0,fill:false,order:0});
+  const allV=[...pesos,...(pesoAlvo?[pesoAlvo]:[])];
+  const minY=allV.length?Math.floor(Math.min(...allV))-2:60,maxY=allV.length?Math.ceil(Math.max(...allV))+2:100;
+  Chart.defaults.font.size=11;Chart.defaults.color='#888886';
+  pesoChart=new Chart(document.getElementById('ch-peso'),{type:'line',data:{labels,datasets},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{maxTicksLimit:8,maxRotation:30}},y:{min:minY,max:maxY,grid:{color:'#2a2a2e'},ticks:{callback:v=>v+' kg'}}}}});
+}
+
+function renderPesoHist(all){
+  const sorted=[...all].reverse();
+  const c=document.getElementById('peso-hist');
+  if(!sorted.length){c.innerHTML='<div style="text-align:center;padding:1.5rem;color:var(--muted);font-size:13px">Nenhum registro ainda.</div>';return;}
+  c.innerHTML=sorted.map((e,i)=>{
+    const prev=sorted[i+1];
+    let deltaHTML='';
+    if(prev){const d=Math.round((e.peso-prev.peso)*10)/10;const col=d<0?'background:var(--green-dim);color:var(--green)':d>0?'background:var(--red-dim);color:var(--red)':'background:var(--card2);color:var(--muted)';deltaHTML=`<span style="font-size:11px;padding:2px 7px;border-radius:8px;${col}">${d>0?'+':''}${d} kg</span>`;}
+    return`<div style="display:flex;align-items:center;gap:10px;padding:7px 10px;background:var(--card2);border-radius:var(--r);border:1px solid var(--border);margin-bottom:4px">
+      <span style="font-size:12px;color:var(--muted);min-width:75px">${fmtDate(e.data)}</span>
+      <span style="font-size:14px;font-weight:600;flex:1">${e.peso} kg</span>
+      ${deltaHTML}
+      <button class="btn-del" onclick="delPeso('${e.id}')">×</button>
+    </div>`;
+  }).join('');
+}
+
+async function delPeso(id){if(!confirm('Remover registro?'))return;await dbDelete('peso',id);loadPeso();showToast('Removido.');}
+
+/* ── INIT ────────────────────────────────────────────── */
+document.addEventListener('DOMContentLoaded',()=>{
+  document.getElementById('f-data').valueAsDate=new Date();
+  document.getElementById('tr-data').valueAsDate=new Date();
+  document.getElementById('pw-data').valueAsDate=new Date();
+  initAuth();
+});
+</script>
+</body>
+</html>
