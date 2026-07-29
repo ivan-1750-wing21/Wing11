@@ -649,8 +649,8 @@ Nota: bom treino, foco em explosão"></textarea></div>
 <script>
 /* ── SUPABASE CONFIG ─────────────────────────────────── */
 // !! SUBSTITUA pelos seus dados do projeto Supabase !!
-const SUPA_URL = 'https://SEU_PROJETO.supabase.co';
-const SUPA_KEY = 'SUA_ANON_KEY';
+const SUPA_URL = 'https://iktlfwkmqkrhcbphukkc.supabase.co';
+const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlrdGxmd2ttcWtyaGNicGh1a2tjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUzMjU1ODcsImV4cCI6MjEwMDkwMTU4N30.pUu0cgydpOpXi20yb3QpZ4YZrW0eQuDM_JrVsgWYYtE';
 
 const { createClient } = supabase;
 const sb = createClient(SUPA_URL, SUPA_KEY);
@@ -665,7 +665,10 @@ async function sendMagicLink(){
   btn.disabled = true; btn.textContent = 'Enviando...';
   const { error } = await sb.auth.signInWithOtp({
     email,
-    options: { shouldCreateUser: true }
+    options: { 
+      shouldCreateUser: true,
+      emailRedirectTo: 'https://ivan-1750-wing21.github.io/Wing11'
+    }
   });
   if(error){
     showAuthError(error.message);
