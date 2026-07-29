@@ -665,10 +665,7 @@ async function sendMagicLink(){
   btn.disabled = true; btn.textContent = 'Enviando...';
   const { error } = await sb.auth.signInWithOtp({
     email,
-    options: { 
-      shouldCreateUser: true,
-      emailRedirectTo: 'https://ivan-1750-wing21.github.io/Wing11'
-    }
+    options: { shouldCreateUser: true }
   });
   if(error){
     showAuthError(error.message);
@@ -943,10 +940,14 @@ Regras: "4x8 120kg" → sets=4,reps=8,carga=120. Cargas diferentes → múltipla
   try{
     const res = await fetch('https://api.anthropic.com/v1/messages',{
       method:'POST',
-      headers:{'Content-Type':'application/json'},
+      headers:{
+        'Content-Type':'application/json',
+        'anthropic-dangerous-allow-browser':'true'
+      },
       body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:1000,messages:[{role:'user',content:prompt}]})
     });
     const data = await res.json();
+    if(data.error){ throw new Error(data.error.message); }
     const raw = data.content.map(c=>c.text||'').join('');
     const clean = raw.replace(/```json|```/g,'').trim();
     const parsed = JSON.parse(clean);
@@ -1043,7 +1044,7 @@ function recalcTestes(){
   const a505=parseFloat(document.getElementById('ts-505d').value)||null;
   const sq=parseFloat(document.getElementById('ts-sq').value)||null;
   const bp=parseFloat(document.getElementById('ts-bp').value)||null;
-  const pu=parseFloat(document.getElementById('ts-pu').value);
+  const puRaw=document.getElementById('ts-pu').value; const pu=puRaw!==''?parseFloat(puRaw):null;
   const pc2=parseFloat(document.getElementById('ts-pc2').value)||null;
   const broncoStr=document.getElementById('ts-bronco').value;
   const bronco=parseBronco(broncoStr);
@@ -1080,7 +1081,7 @@ async function salvarTeste(){
   const a505nd=parseFloat(document.getElementById('ts-505nd').value)||null;
   const sq=parseFloat(document.getElementById('ts-sq').value)||null;
   const bp=parseFloat(document.getElementById('ts-bp').value)||null;
-  const pu=parseFloat(document.getElementById('ts-pu').value);
+  const puRaw=document.getElementById('ts-pu').value; const pu=puRaw!==''?parseFloat(puRaw):null;
   const pc2=parseFloat(document.getElementById('ts-pc2').value)||null;
   const broncoStr=document.getElementById('ts-bronco').value;
   const bronco=parseBronco(broncoStr)||null;
@@ -1092,9 +1093,9 @@ async function salvarTeste(){
   if(t40) scores.vel=SC.vel40(t40);
   if(a505d) scores.a505=SC.a505(a505d);
   if(bronco) scores.res=SC.bronco(bronco);
-  if(pc&&sq&&bp&&!isNaN(pu)&&pc2) scores.for=Math.round(SC.sqRel(sq/pc)*0.35+SC.bpRel(bp/pc)*0.25+SC.pu(pu)*0.20+SC.pcRel(pc2/pc)*0.20);
+  if(pc&&sq&&bp&&pu!==null&&!isNaN(pu)&&pc2) scores.for=Math.round(SC.sqRel(sq/pc)*0.35+SC.bpRel(bp/pc)*0.25+SC.pu(pu)*0.20+SC.pcRel(pc2/pc)*0.20);
 
-  const obj={data,sup:document.getElementById('ts-sup').value,cond:document.getElementById('ts-cond').value,obs:document.getElementById('ts-obs').value,pc,cmj,t10,t40,a505d,a505nd,sq,bp,pu:!isNaN(pu)?pu:null,pc2,bronco,broncoStr,scores};
+  const obj={data,sup:document.getElementById('ts-sup').value,cond:document.getElementById('ts-cond').value,obs:document.getElementById('ts-obs').value,pc,cmj,t10,t40,a505d,a505nd,sq,bp,pu:pu!==null&&!isNaN(pu)?pu:null,pc2,bronco,broncoStr,scores};
   const {error}=await dbInsert('testes',obj);
   if(error){showToast('Erro ao salvar.',true);return;}
   showToast('Testes salvos!');
@@ -1196,7 +1197,7 @@ async function streamAnalysis(prompt,targetEl){
   targetEl.className='ai-content';
   targetEl.innerHTML='<span class="cursor"></span>';
   try{
-    const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:1000,stream:true,messages:[{role:'user',content:prompt}]})});
+    const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','anthropic-dangerous-allow-browser':'true'},body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:1000,stream:true,messages:[{role:'user',content:prompt}]})});
     const reader=res.body.getReader(),decoder=new TextDecoder();
     let buffer='',text='';
     while(true){
